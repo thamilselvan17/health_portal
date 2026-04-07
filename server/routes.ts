@@ -20,6 +20,11 @@ export async function registerRoutes(
 ): Promise<Server> {
   const MemStore = MemoryStore(session);
 
+  // Trust Vercel's reverse proxy for secure cookies
+  if (process.env.VERCEL) {
+    app.set("trust proxy", 1);
+  }
+
   const sessionParser = session({
     store: new MemStore({
       checkPeriod: 86400000 
@@ -27,13 +32,22 @@ export async function registerRoutes(
     secret: process.env.SESSION_SECRET || "super-secret-key",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === "production" }
+    cookie: {
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      httpOnly: true,
+    }
   });
 
   app.use(sessionParser);
   
   // Setup WebSocket server
   const wsServer = setupWebSocket(httpServer, sessionParser);
+
+  // Health check (no DB dependency — useful for diagnosing Vercel routing)
+  app.get("/api/health", (_req, res) => {
+    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+  });
 
   // Auth Middleware
   const requireAuth = (req: any, res: any, next: any) => {

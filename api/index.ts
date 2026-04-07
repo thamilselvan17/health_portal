@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
 
 const app = express();
@@ -23,19 +22,42 @@ app.use(express.urlencoded({ extended: false }));
 
 const httpServer = createServer(app);
 
-const setupPromise = (async () => {
-  await registerRoutes(httpServer, app);
+let setupDone = false;
+let setupError: Error | null = null;
 
-  app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error("Internal Server Error:", err);
-    if (res.headersSent) return next(err);
-    return res.status(status).json({ message });
-  });
+const setupPromise = (async () => {
+  try {
+    // Dynamic import so native-module errors are caught here
+    const { registerRoutes } = await import("../server/routes");
+    await registerRoutes(httpServer, app);
+
+    app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+      const status = err.status || err.statusCode || 500;
+      const message = err.message || "Internal Server Error";
+      console.error("Express error handler:", err);
+      if (res.headersSent) return next(err);
+      return res.status(status).json({ message });
+    });
+
+    setupDone = true;
+  } catch (err: any) {
+    console.error("FATAL: Failed to initialize API handler:", err);
+    setupError = err;
+
+    // Fallback: still respond so Vercel doesn't show a generic 500
+    app.use((_req: Request, res: Response) => {
+      res.status(500).json({
+        message: "Server initialization failed",
+        error: err?.message || String(err),
+      });
+    });
+    setupDone = true;
+  }
 })();
 
 export default async function handler(req: any, res: any) {
-  await setupPromise;
+  if (!setupDone) {
+    await setupPromise;
+  }
   app(req, res);
 }
