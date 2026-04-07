@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: 'DM Sans', sans-serif;
+    --font-display: 'Outfit', sans-serif;
+
+    /* Soft medical blue theme */
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    /* Primary: Trustworthy Medical Green */
+    --primary: 142 71% 45%;
+    --primary-foreground: 144 100% 98%;
+
+    /* Secondary: Soft mint/green */
+    --secondary: 142 40% 94%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 142 71% 45%;
+
+    --radius: 1rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 142 71% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 142 40% 96%;
+    --sidebar-accent-foreground: 240 5.3% 26.1%;
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 142 71% 45%;
+  }
+
+  .dark {
+    /* Pitch dark midnight background */
+    --background: 224 71% 4%; 
+    --foreground: 210 40% 98%;
+
+    /* Slightly elevated cards with slate tint */
+    --card: 222 47% 7%;
+    --card-foreground: 210 40% 98%;
+
+    /* Popovers share card aesthetics */
+    --popover: 222 47% 7%;
+    --popover-foreground: 210 40% 98%;
+
+    /* Vivid neon medical green for primary actions */
+    --primary: 153 60% 53%;
+    --primary-foreground: 240 5.9% 10%;
+
+    /* Secondary actions are muted but visible */
+    --secondary: 217 32% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    /* Muted elements and text for subtle distinction */
+    --muted: 217 32% 17%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    /* Accent colors for interactive states */
+    --accent: 217 32% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    /* Destructive remains sharp */
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    /* Crisp borders separating dark elements */
+    --border: 217 32% 17%;
+    --input: 217 32% 17%;
+    --ring: 153 60% 53%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    @apply tracking-tight;
+  }
+}
+
+/* Custom Utilities for Depth & Polish */
+@layer utilities {
+  .glass-card {
+    @apply bg-white/80 dark:bg-black/40 backdrop-blur-md border border-white/20 dark:border-white/5 shadow-xl shadow-black/5 dark:shadow-black/50;
+  }
+  .hero-gradient {
+    @apply bg-gradient-to-br from-primary/10 via-background to-secondary/30 dark:from-primary/20 dark:via-background dark:to-emerald-900/20;
+  }
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-green-400 dark:from-green-400 dark:to-emerald-200;
+  }
+}

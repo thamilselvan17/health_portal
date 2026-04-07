@@ -1,0 +1,1 @@
+"# campus_health_portal"  initgit add README.mdgit commit -m "first commit"git branch -M maingit remote add origin https://github.com/thamilselvan17/campus_health_portal.gitgit push -u origin main
