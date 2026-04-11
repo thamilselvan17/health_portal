@@ -22,7 +22,7 @@ export async function registerRoutes(
 
   // Trust Vercel's reverse proxy for secure cookies
   if (process.env.VERCEL) {
-    app.set("trust proxy", 1);
+    app.set("trust proxy", true);
   }
 
   const sessionParser = session({

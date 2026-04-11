@@ -55,6 +55,13 @@ const setupPromise = (async () => {
   }
 })();
 
+export const config = {
+  api: {
+    bodyParser: false,
+    externalResolver: true,
+  },
+};
+
 export default async function handler(req: any, res: any) {
   if (!setupDone) {
     await setupPromise;
