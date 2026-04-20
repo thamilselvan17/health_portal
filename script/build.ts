@@ -21,7 +21,8 @@ async function build() {
     format: "cjs",
     outfile: path.resolve(rootDir, "dist", "index.cjs"),
     external: [
-      "better-sqlite3",
+      "mongoose",
+      "dotenv",
       // Node built-ins and heavy deps are kept external for CJS bundle
       "express",
       "express-session",

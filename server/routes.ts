@@ -24,8 +24,8 @@ export async function registerRoutes(
 
   const MemStore = MemoryStore(session);
 
-  // Trust Vercel's reverse proxy for secure cookies
-  if (process.env.VERCEL) {
+  // Trust proxy for secure cookies (required for Render, Vercel, etc.)
+  if (process.env.NODE_ENV === "production" || process.env.VERCEL || process.env.RENDER) {
     app.set("trust proxy", true);
   }
 
