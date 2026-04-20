@@ -8,7 +8,7 @@ const userResponseSchema = z.object({
   name: z.string(),
   email: z.string(),
   role: z.string(),
-  avatar: z.string().nullable(),
+  avatar: z.string().optional().nullable(),
 });
 
 const appointmentResponseSchema = z.object({
@@ -18,9 +18,9 @@ const appointmentResponseSchema = z.object({
   date: z.coerce.date(),
   reason: z.string(),
   status: z.string(),
-  notes: z.string().nullable(),
-  rating: z.number().nullable(),
-  feedback: z.string().nullable(),
+  notes: z.string().optional().nullable(),
+  rating: z.number().optional().nullable(),
+  feedback: z.string().optional().nullable(),
 });
 
 const medicalRecordResponseSchema = z.object({
@@ -29,8 +29,8 @@ const medicalRecordResponseSchema = z.object({
   doctorId: z.string(),
   date: z.coerce.date(),
   diagnosis: z.string(),
-  prescription: z.string().nullable(),
-  notes: z.string().nullable(),
+  prescription: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
 export type AuthResponse = z.infer<typeof userResponseSchema>;
