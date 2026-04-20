@@ -1,92 +1,94 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// ── Users ──────────────────────────────────────────────
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
-  password: text("password").notNull(),
-  role: text("role", { enum: ["student", "doctor"] }).notNull(),
-  avatar: text("avatar"),
+// ── Shared Types ───────────────────────────────────────
+// We use string IDs to stay native to MongoDB ObjectIds
+
+export const userSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  password: z.string(),
+  role: z.enum(["student", "doctor", "admin"]),
+  avatar: z.string().optional().nullable(),
 });
 
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export type User = typeof users.$inferSelect;
-export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = z.infer<typeof userSchema>;
 export type UserWithoutPassword = Omit<User, "password">;
+export const insertUserSchema = userSchema.omit({ id: true });
+export type InsertUser = z.infer<typeof insertUserSchema>;
 
-// ── Appointments ───────────────────────────────────────
-export const appointments = sqliteTable("appointments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  studentId: integer("student_id").notNull(),
-  doctorId: integer("doctor_id").notNull(),
-  date: integer("date", { mode: "timestamp" }).notNull(),
-  reason: text("reason").notNull(),
-  status: text("status", { enum: ["pending", "approved", "rejected", "completed"] }).notNull().default("pending"),
-  notes: text("notes"),
-  rating: integer("rating"),
-  feedback: text("feedback"),
+export const appointmentSchema = z.object({
+  id: z.string(),
+  studentId: z.string(),
+  doctorId: z.string(),
+  date: z.coerce.date(),
+  reason: z.string(),
+  status: z.enum(["pending", "approved", "rejected", "completed"]),
+  notes: z.string().optional().nullable(),
+  rating: z.number().optional().nullable(),
+  feedback: z.string().optional().nullable(),
 });
 
-export const insertAppointmentSchema = createInsertSchema(appointments).omit({ id: true });
-export type Appointment = typeof appointments.$inferSelect;
+export type Appointment = z.infer<typeof appointmentSchema>;
+// status is optional for insertion as it defaults to 'pending'
+export const insertAppointmentSchema = appointmentSchema.omit({ id: true, status: true }).extend({
+  status: z.enum(["pending", "approved", "rejected", "completed"]).optional()
+});
 export type InsertAppointment = z.infer<typeof insertAppointmentSchema>;
 
-// ── Medical Records ────────────────────────────────────
-export const medicalRecords = sqliteTable("medical_records", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  patientId: integer("patient_id").notNull(),
-  doctorId: integer("doctor_id").notNull(),
-  date: integer("date", { mode: "timestamp" }).notNull(),
-  diagnosis: text("diagnosis").notNull(),
-  prescription: text("prescription"),
-  notes: text("notes"),
+export const medicalRecordSchema = z.object({
+  id: z.string(),
+  patientId: z.string(),
+  doctorId: z.string(),
+  date: z.coerce.date(),
+  diagnosis: z.string(),
+  prescription: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
 });
 
-export const insertMedicalRecordSchema = createInsertSchema(medicalRecords).omit({ id: true });
-export type MedicalRecord = typeof medicalRecords.$inferSelect;
+export type MedicalRecord = z.infer<typeof medicalRecordSchema>;
+export const insertMedicalRecordSchema = medicalRecordSchema.omit({ id: true, date: true });
 export type InsertMedicalRecord = z.infer<typeof insertMedicalRecordSchema>;
 
-// ── Doctor Availability ────────────────────────────────
-export const doctorAvailability = sqliteTable("doctor_availability", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  doctorId: integer("doctor_id").notNull(),
-  dayOfWeek: integer("day_of_week").notNull(), // 0=Sunday … 6=Saturday
-  startTime: text("start_time").notNull(),      // "HH:mm"
-  endTime: text("end_time").notNull(),            // "HH:mm"
+export const doctorAvailabilitySchema = z.object({
+  id: z.string(),
+  doctorId: z.string(),
+  dayOfWeek: z.number(), // 0=Sunday … 6=Saturday
+  startTime: z.string(),      // "HH:mm"
+  endTime: z.string(),        // "HH:mm"
 });
 
-export const insertDoctorAvailabilitySchema = createInsertSchema(doctorAvailability).omit({ id: true });
-export type DoctorAvailability = typeof doctorAvailability.$inferSelect;
+export type DoctorAvailability = z.infer<typeof doctorAvailabilitySchema>;
+export const insertDoctorAvailabilitySchema = doctorAvailabilitySchema.omit({ id: true });
 export type InsertDoctorAvailability = z.infer<typeof insertDoctorAvailabilitySchema>;
 
-// ── Messages ───────────────────────────────────────────
-export const messages = sqliteTable("messages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  senderId: integer("sender_id").notNull(),
-  receiverId: integer("receiver_id").notNull(),
-  content: text("content").notNull(),
-  timestamp: integer("timestamp", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  read: integer("read", { mode: "boolean" }).notNull().default(false),
+export const messageSchema = z.object({
+  id: z.string(),
+  senderId: z.string(),
+  receiverId: z.string(),
+  content: z.string(),
+  timestamp: z.coerce.date(),
+  read: z.boolean(),
 });
 
-export const insertMessageSchema = createInsertSchema(messages).omit({ id: true });
-export type Message = typeof messages.$inferSelect;
+export type Message = z.infer<typeof messageSchema>;
+export const insertMessageSchema = messageSchema.omit({ id: true, timestamp: true, read: true }).extend({
+  read: z.boolean().optional()
+});
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 
-// ── Notifications ──────────────────────────────────────
-export const notifications = sqliteTable("notifications", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  userId: integer("user_id").notNull(),
-  message: text("message").notNull(),
-  type: text("type").notNull(),
-  relatedId: integer("related_id"),
-  timestamp: integer("timestamp", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
-  read: integer("read", { mode: "boolean" }).notNull().default(false),
+export const notificationSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  message: z.string(),
+  type: z.string(),
+  relatedId: z.string().optional().nullable(),
+  timestamp: z.coerce.date(),
+  read: z.boolean(),
 });
 
-export const insertNotificationSchema = createInsertSchema(notifications).omit({ id: true });
-export type Notification = typeof notifications.$inferSelect;
+export type Notification = z.infer<typeof notificationSchema>;
+export const insertNotificationSchema = notificationSchema.omit({ id: true, timestamp: true, read: true }).extend({
+  read: z.boolean().optional()
+});
 export type InsertNotification = z.infer<typeof insertNotificationSchema>;

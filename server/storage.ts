@@ -1,198 +1,328 @@
-import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { mongoose } from "./db";
 import {
-  users, appointments, medicalRecords, doctorAvailability,
   type User, type InsertUser, type UserWithoutPassword,
   type Appointment, type InsertAppointment,
   type MedicalRecord, type InsertMedicalRecord,
   type DoctorAvailability, type InsertDoctorAvailability,
   type Message, type InsertMessage,
-  type Notification, type InsertNotification,
-  messages, notifications
+  type Notification, type InsertNotification
 } from "@shared/schema";
-import { or, and } from "drizzle-orm";
+
+// ── Models ─────────────────────────────────────────────
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  role: { type: String, enum: ["student", "doctor", "admin"], required: true },
+  avatar: { type: String },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const appointmentSchema = new mongoose.Schema({
+  studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  date: { type: Date, required: true },
+  reason: { type: String, required: true },
+  status: { type: String, enum: ["pending", "approved", "rejected", "completed"], default: "pending" },
+  notes: { type: String },
+  rating: { type: Number },
+  feedback: { type: String },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      ret.studentId = ret.studentId.toString();
+      ret.doctorId = ret.doctorId.toString();
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const medicalRecordSchema = new mongoose.Schema({
+  patientId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  date: { type: Date, default: Date.now },
+  diagnosis: { type: String, required: true },
+  prescription: { type: String },
+  notes: { type: String },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      ret.patientId = ret.patientId.toString();
+      ret.doctorId = ret.doctorId.toString();
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const doctorAvailabilitySchema = new mongoose.Schema({
+  doctorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  dayOfWeek: { type: Number, required: true },
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      ret.doctorId = ret.doctorId.toString();
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const messageSchema = new mongoose.Schema({
+  senderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  receiverId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  content: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now },
+  read: { type: Boolean, default: false },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      ret.senderId = ret.senderId.toString();
+      ret.receiverId = ret.receiverId.toString();
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const notificationSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  message: { type: String, required: true },
+  type: { type: String, required: true },
+  relatedId: { type: String },
+  timestamp: { type: Date, default: Date.now },
+  read: { type: Boolean, default: false },
+}, { 
+  toJSON: { 
+    transform: (doc, ret: any) => { 
+      ret.id = ret._id.toString(); 
+      ret.userId = ret.userId.toString();
+      delete ret._id; 
+      delete ret.__v; 
+    } 
+  } 
+});
+
+const UserModel = mongoose.model("User", userSchema);
+const AppointmentModel = mongoose.model("Appointment", appointmentSchema);
+const MedicalRecordModel = mongoose.model("MedicalRecord", medicalRecordSchema);
+const DoctorAvailabilityModel = mongoose.model("DoctorAvailability", doctorAvailabilitySchema);
+const MessageModel = mongoose.model("Message", messageSchema);
+const NotificationModel = mongoose.model("Notification", notificationSchema);
+
+// ── Storage Implementation ─────────────────────────────
 
 export interface IStorage {
-  getUser(id: number): Promise<User | undefined>;
+  getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUserAvatar(id: number, avatar: string): Promise<User>;
+  updateUserAvatar(id: string, avatar: string): Promise<User>;
   getDoctors(): Promise<UserWithoutPassword[]>;
   getPatients(): Promise<UserWithoutPassword[]>;
 
   getAppointments(): Promise<Appointment[]>;
-  getAppointmentsByUser(userId: number, role: string): Promise<Appointment[]>;
+  getAppointmentsByUser(userId: string, role: string): Promise<Appointment[]>;
   createAppointment(appointment: InsertAppointment): Promise<Appointment>;
-  updateAppointment(id: number, status: string, notes?: string): Promise<Appointment>;
-  addAppointmentFeedback(id: number, rating: number, feedback: string): Promise<Appointment>;
-  deleteAppointment(id: number): Promise<void>;
+  updateAppointment(id: string, status: "pending" | "approved" | "rejected" | "completed", notes?: string): Promise<Appointment>;
+  addAppointmentFeedback(id: string, rating: number, feedback: string): Promise<Appointment>;
+  deleteAppointment(id: string): Promise<void>;
 
-  getMedicalRecordsByUser(userId: number, role: string): Promise<MedicalRecord[]>;
+  getMedicalRecordsByUser(userId: string, role: string): Promise<MedicalRecord[]>;
   createMedicalRecord(record: InsertMedicalRecord): Promise<MedicalRecord>;
 
-  getDoctorAvailability(doctorId: number): Promise<DoctorAvailability[]>;
-  updateDoctorAvailability(doctorId: number, availability: InsertDoctorAvailability[]): Promise<DoctorAvailability[]>;
+  getDoctorAvailability(doctorId: string): Promise<DoctorAvailability[]>;
+  updateDoctorAvailability(doctorId: string, availability: InsertDoctorAvailability[]): Promise<DoctorAvailability[]>;
 
-  // Real-time features
-  getMessages(userId1: number, userId2: number): Promise<Message[]>;
+  getMessages(userId1: string, userId2: string): Promise<Message[]>;
   createMessage(message: InsertMessage): Promise<Message>;
-  markMessagesRead(receiverId: number, senderId: number): Promise<void>;
+  markMessagesRead(receiverId: string, senderId: string): Promise<void>;
   
-  getNotifications(userId: number): Promise<Notification[]>;
+  getNotifications(userId: string): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
-  markNotificationRead(id: number): Promise<void>;
+  markNotificationRead(id: string): Promise<void>;
+
+  getAdminMetrics(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
-  async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+  async getUser(id: string): Promise<User | undefined> {
+    if (!mongoose.Types.ObjectId.isValid(id)) return undefined;
+    const user = await UserModel.findById(id);
+    return user ? user.toJSON() as any as User : undefined;
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
-    return user;
+    const user = await UserModel.findOne({ email });
+    return user ? user.toJSON() as any as User : undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db.insert(users).values(insertUser).returning();
-    return user;
+    const user = new UserModel(insertUser);
+    await user.save();
+    return user.toJSON() as any as User;
   }
 
-  async updateUserAvatar(id: number, avatar: string): Promise<User> {
-    const [updated] = await db.update(users)
-      .set({ avatar })
-      .where(eq(users.id, id))
-      .returning();
-    return updated;
+  async updateUserAvatar(id: string, avatar: string): Promise<User> {
+    const user = await UserModel.findByIdAndUpdate(id, { avatar }, { new: true });
+    if (!user) throw new Error("User not found");
+    return user.toJSON() as any as User;
   }
 
   async getDoctors(): Promise<UserWithoutPassword[]> {
-    const doctorsList = await db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      avatar: users.avatar,
-    }).from(users).where(eq(users.role, "doctor"));
-    return doctorsList;
+    const doctors = await UserModel.find({ role: "doctor" });
+    return doctors.map(u => u.toJSON() as any as UserWithoutPassword);
   }
 
   async getPatients(): Promise<UserWithoutPassword[]> {
-    const patientsList = await db.select({
-      id: users.id,
-      name: users.name,
-      email: users.email,
-      role: users.role,
-      avatar: users.avatar,
-    }).from(users).where(eq(users.role, "student"));
-    return patientsList;
+    const patients = await UserModel.find({ role: "student" });
+    return patients.map(u => u.toJSON() as any as UserWithoutPassword);
   }
 
   async getAppointments(): Promise<Appointment[]> {
-    return await db.select().from(appointments);
+    const appointments = await AppointmentModel.find();
+    return appointments.map(a => a.toJSON() as any as Appointment);
   }
 
-  async getAppointmentsByUser(userId: number, role: string): Promise<Appointment[]> {
-    if (role === "student") {
-      return await db.select().from(appointments).where(eq(appointments.studentId, userId));
-    } else {
-      return await db.select().from(appointments).where(eq(appointments.doctorId, userId));
-    }
+  async getAppointmentsByUser(userId: string, role: string): Promise<Appointment[]> {
+    const query = role === "student" ? { studentId: userId } : { doctorId: userId };
+    const appointments = await AppointmentModel.find(query);
+    return appointments.map(a => a.toJSON() as any as Appointment);
   }
 
   async createAppointment(appointment: InsertAppointment): Promise<Appointment> {
-    const [created] = await db.insert(appointments).values(appointment).returning();
-    return created;
+    const created = new AppointmentModel(appointment);
+    await created.save();
+    return created.toJSON() as any as Appointment;
   }
 
-  async updateAppointment(id: number, status: string, notes?: string): Promise<Appointment> {
-    const updateData: Partial<Appointment> = { status };
-    if (notes !== undefined) updateData.notes = notes;
-
-    const [updated] = await db.update(appointments)
-      .set(updateData)
-      .where(eq(appointments.id, id))
-      .returning();
-    return updated;
+  async updateAppointment(id: string, status: "pending" | "approved" | "rejected" | "completed", notes?: string): Promise<Appointment> {
+    const update: any = { status };
+    if (notes !== undefined) update.notes = notes;
+    const updated = await AppointmentModel.findByIdAndUpdate(id, update, { new: true });
+    if (!updated) throw new Error("Appointment not found");
+    return updated.toJSON() as any as Appointment;
   }
 
-  async addAppointmentFeedback(id: number, rating: number, feedback: string): Promise<Appointment> {
-    const [updated] = await db.update(appointments)
-      .set({ rating, feedback })
-      .where(eq(appointments.id, id))
-      .returning();
-    return updated;
+  async addAppointmentFeedback(id: string, rating: number, feedback: string): Promise<Appointment> {
+    const updated = await AppointmentModel.findByIdAndUpdate(id, { rating, feedback }, { new: true });
+    if (!updated) throw new Error("Appointment not found");
+    return updated.toJSON() as any as Appointment;
   }
 
-  async deleteAppointment(id: number): Promise<void> {
-    await db.delete(appointments).where(eq(appointments.id, id));
+  async deleteAppointment(id: string): Promise<void> {
+    await AppointmentModel.findByIdAndDelete(id);
   }
 
-  async getMedicalRecordsByUser(userId: number, role: string): Promise<MedicalRecord[]> {
-    if (role === "student") {
-      return await db.select().from(medicalRecords).where(eq(medicalRecords.patientId, userId));
-    } else {
-      return await db.select().from(medicalRecords).where(eq(medicalRecords.doctorId, userId));
-    }
+  async getMedicalRecordsByUser(userId: string, role: string): Promise<MedicalRecord[]> {
+    const query = role === "student" ? { patientId: userId } : { doctorId: userId };
+    const records = await MedicalRecordModel.find(query);
+    return records.map(r => r.toJSON() as any as MedicalRecord);
   }
 
   async createMedicalRecord(record: InsertMedicalRecord): Promise<MedicalRecord> {
-    const [created] = await db.insert(medicalRecords).values({ ...record, date: new Date() }).returning();
-    return created;
+    const created = new MedicalRecordModel(record);
+    await created.save();
+    return created.toJSON() as any as MedicalRecord;
   }
 
-  async getDoctorAvailability(doctorId: number): Promise<DoctorAvailability[]> {
-    return await db.select().from(doctorAvailability).where(eq(doctorAvailability.doctorId, doctorId));
+  async getDoctorAvailability(doctorId: string): Promise<DoctorAvailability[]> {
+    const availability = await DoctorAvailabilityModel.find({ doctorId });
+    return availability.map(a => a.toJSON() as any as DoctorAvailability);
   }
 
-  async updateDoctorAvailability(doctorId: number, availability: InsertDoctorAvailability[]): Promise<DoctorAvailability[]> {
-    await db.delete(doctorAvailability).where(eq(doctorAvailability.doctorId, doctorId));
-    
+  async updateDoctorAvailability(doctorId: string, availability: InsertDoctorAvailability[]): Promise<DoctorAvailability[]> {
+    await DoctorAvailabilityModel.deleteMany({ doctorId });
     if (availability.length === 0) return [];
     
-    return await db.insert(doctorAvailability).values(availability).returning();
+    const docs = await DoctorAvailabilityModel.insertMany(
+      availability.map(a => ({ ...a, doctorId }))
+    );
+    return (docs as any[]).map(d => d.toJSON() as any as DoctorAvailability);
   }
 
-  async getMessages(userId1: number, userId2: number): Promise<Message[]> {
-    return await db.select()
-      .from(messages)
-      .where(
-        or(
-          and(eq(messages.senderId, userId1), eq(messages.receiverId, userId2)),
-          and(eq(messages.senderId, userId2), eq(messages.receiverId, userId1))
-        )
-      )
-      .orderBy(messages.timestamp);
+  async getMessages(userId1: string, userId2: string): Promise<Message[]> {
+    const messages = await MessageModel.find({
+      $or: [
+        { senderId: userId1, receiverId: userId2 },
+        { senderId: userId2, receiverId: userId1 }
+      ]
+    }).sort({ timestamp: 1 });
+    return messages.map(m => m.toJSON() as any as Message);
   }
 
   async createMessage(message: InsertMessage): Promise<Message> {
-    const [created] = await db.insert(messages).values(message).returning();
-    return created;
+    const created = new MessageModel(message);
+    await created.save();
+    return created.toJSON() as any as Message;
   }
 
-  async markMessagesRead(receiverId: number, senderId: number): Promise<void> {
-    await db.update(messages)
-      .set({ read: true })
-      .where(and(eq(messages.receiverId, receiverId), eq(messages.senderId, senderId)));
+  async markMessagesRead(receiverId: string, senderId: string): Promise<void> {
+    await MessageModel.updateMany(
+      { receiverId, senderId },
+      { read: true }
+    );
   }
 
-  async getNotifications(userId: number): Promise<Notification[]> {
-    return await db.select()
-      .from(notifications)
-      .where(eq(notifications.userId, userId))
-      .orderBy(notifications.timestamp);
+  async getNotifications(userId: string): Promise<Notification[]> {
+    const notifications = await NotificationModel.find({ userId }).sort({ timestamp: 1 });
+    return notifications.map(n => n.toJSON() as any as Notification);
   }
 
   async createNotification(notification: InsertNotification): Promise<Notification> {
-    const [created] = await db.insert(notifications).values(notification).returning();
-    return created;
+    const created = new NotificationModel(notification);
+    await created.save();
+    return created.toJSON() as any as Notification;
   }
 
-  async markNotificationRead(id: number): Promise<void> {
-    await db.update(notifications)
-      .set({ read: true })
-      .where(eq(notifications.id, id));
+  async markNotificationRead(id: string): Promise<void> {
+    await NotificationModel.findByIdAndUpdate(id, { read: true });
+  }
+
+  async getAdminMetrics(): Promise<any> {
+    const [totalStudents, totalDoctors, totalAppointments, totalRecords, allAppointments] = await Promise.all([
+      UserModel.countDocuments({ role: "student" }),
+      UserModel.countDocuments({ role: "doctor" }),
+      AppointmentModel.countDocuments(),
+      MedicalRecordModel.countDocuments(),
+      AppointmentModel.find({}, 'status')
+    ]);
+
+    const appointmentsByStatus: Record<string, number> = {
+      pending: 0,
+      approved: 0,
+      completed: 0,
+      rejected: 0
+    };
+
+    allAppointments.forEach(app => {
+      const status = (app as any).status;
+      if (appointmentsByStatus[status] !== undefined) {
+        appointmentsByStatus[status]++;
+      }
+    });
+
+    return {
+      totalStudents,
+      totalDoctors,
+      totalAppointments,
+      totalRecords,
+      appointmentsByStatus
+    };
   }
 }
 

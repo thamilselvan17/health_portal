@@ -2,6 +2,7 @@ import type { Express } from "express";
 import type { Server } from "http";
 import { storage } from "./storage";
 import { setupWebSocket } from "./websocket";
+import { connectDB } from "./db";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import session from "express-session";
@@ -9,7 +10,7 @@ import MemoryStore from "memorystore";
 
 declare module "express-session" {
   interface SessionData {
-    userId: number;
+    userId: string;
     role: string;
   }
 }
@@ -18,6 +19,9 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
+  // Initialize MongoDB connection
+  await connectDB();
+
   const MemStore = MemoryStore(session);
 
   // Trust Vercel's reverse proxy for secure cookies
@@ -53,6 +57,13 @@ export async function registerRoutes(
   const requireAuth = (req: any, res: any, next: any) => {
     if (!req.session.userId) {
       return res.status(401).json({ message: "Unauthorized" });
+    }
+    next();
+  };
+
+  const requireAdmin = (req: any, res: any, next: any) => {
+    if (!req.session.userId || req.session.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden: Admins only" });
     }
     next();
   };
@@ -139,32 +150,36 @@ export async function registerRoutes(
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
+      console.error("Avatar update error:", err);
       return res.status(500).json({ message: "Internal server error" });
     }
   });
 
+  // Admin
+  app.get(api.admin.metrics.path, requireAdmin, async (_req, res) => {
+    const metrics = await storage.getAdminMetrics();
+    res.status(200).json(metrics);
+  });
+
   // Doctor Availability
   app.get(api.doctorAvailability.get.path, requireAuth, async (req, res) => {
-    const doctorId = parseInt(req.params.id);
+    const doctorId = req.params.id as string;
     const availability = await storage.getDoctorAvailability(doctorId);
     res.status(200).json(availability);
   });
 
   app.put(api.doctorAvailability.update.path, requireAuth, async (req, res) => {
     try {
-      if (req.session.role !== "doctor") {
-        return res.status(401).json({ message: "Only doctors can update availability" });
+      if (req.session.role !== "doctor" || req.session.userId !== req.params.id) {
+        return res.status(403).json({ message: "Forbidden" });
       }
-      
-      const input = api.doctorAvailability.update.input.parse(req.body);
-      
-      const updatedAvailabilityData = input.availability.map(slot => ({
-        ...slot,
-        doctorId: req.session.userId!
-      }));
-      
-      const savedAvailability = await storage.updateDoctorAvailability(req.session.userId!, updatedAvailabilityData as any);
-      res.status(200).json(savedAvailability);
+      const { availability } = api.doctorAvailability.update.input.parse(req.body);
+      const doctorId = req.params.id as string;
+      const updated = await storage.updateDoctorAvailability(
+        doctorId, 
+        availability.map(a => ({ ...a, doctorId }))
+      );
+      res.status(200).json(updated);
     } catch (err) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
@@ -175,61 +190,45 @@ export async function registerRoutes(
 
   app.get(api.doctorAvailability.slots.path, requireAuth, async (req, res) => {
     try {
-      const doctorId = parseInt(req.params.id);
+      const doctorId = req.params.id as string;
       const dateStr = req.query.date as string;
       
       if (!dateStr || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        return res.status(400).json({ message: "Valid date query parameter (YYYY-MM-DD) is required" });
+        return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
       }
 
-      const targetDate = new Date(dateStr);
-      const dayOfWeek = targetDate.getDay(); 
-
+      const date = new Date(dateStr);
+      const dayOfWeek = date.getDay();
+      
       const availability = await storage.getDoctorAvailability(doctorId);
-      const dayAvailability = availability.filter(a => a.dayOfWeek === dayOfWeek);
-
-      if (dayAvailability.length === 0) {
-        return res.status(200).json([]); 
+      const daySchedule = availability.find(a => a.dayOfWeek === dayOfWeek);
+      
+      if (!daySchedule) {
+        return res.status(200).json([]);
       }
 
-      const slots: string[] = [];
-      for (const period of dayAvailability) {
-        let currentSlot = period.startTime; 
-        
-        while (currentSlot < period.endTime) {
-          slots.push(currentSlot);
-          
-          const [hours, mins] = currentSlot.split(":").map(Number);
-          const totalMins = hours * 60 + mins + 30;
-          const nextHours = Math.floor(totalMins / 60).toString().padStart(2, "0");
-          const nextMins = (totalMins % 60).toString().padStart(2, "0");
-          currentSlot = `${nextHours}:${nextMins}`;
+      // Simple slot generation: every 30 mins
+      const slots = [];
+      let current = new Date(`${dateStr}T${daySchedule.startTime}`);
+      const end = new Date(`${dateStr}T${daySchedule.endTime}`);
+      
+      // Get existing appointments to filter slots
+      const appointments = await storage.getAppointments();
+      const bookedSlots = appointments
+        .filter(a => a.doctorId === doctorId && a.status !== "rejected")
+        .map(a => new Date(a.date).toISOString());
+
+      while (current < end) {
+        const slotTime = current.toISOString();
+        if (!bookedSlots.includes(slotTime)) {
+          slots.push(slotTime);
         }
+        current = new Date(current.getTime() + 30 * 60000);
       }
 
-      const appointments = await storage.getAppointmentsByUser(doctorId, "doctor");
-      const bookedAppointments = appointments.filter(app => {
-        if (app.status === "rejected") return false;
-        
-        const appDate = new Date(app.date);
-        const appDateStr = `${appDate.getFullYear()}-${String(appDate.getMonth() + 1).padStart(2, '0')}-${String(appDate.getDate()).padStart(2, '0')}`;
-        return appDateStr === dateStr;
-      });
-
-      const bookedTimes = bookedAppointments.map(app => {
-        const appDate = new Date(app.date);
-        const hours = appDate.getHours().toString().padStart(2, "0");
-        const mins = appDate.getMinutes().toString().padStart(2, "0");
-        return `${hours}:${mins}`;
-      });
-
-      const availableSlots = slots.filter(slot => !bookedTimes.includes(slot));
-      availableSlots.sort();
-
-      res.status(200).json(availableSlots);
+      res.status(200).json(slots);
     } catch (err) {
-      console.error("Error fetching slots:", err);
-      res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -243,26 +242,29 @@ export async function registerRoutes(
     try {
       const inputSchema = api.appointments.create.input.extend({
         date: z.coerce.date(),
-        studentId: z.coerce.number(),
-        doctorId: z.coerce.number()
+        studentId: z.string(),
+        doctorId: z.string()
       });
       const input = inputSchema.parse(req.body);
       
-      if (req.session.role === "student" && input.studentId !== req.session.userId) {
-        return res.status(401).json({ message: "Can only book for yourself" });
+      if (input.studentId !== req.session.userId) {
+        return res.status(401).json({ message: "Can only create appointments for yourself" });
       }
 
       const appointment = await storage.createAppointment(input);
       
-      // Notify the doctor
-      const notification = await storage.createNotification({
+      // Create notification for doctor
+      await storage.createNotification({
         userId: appointment.doctorId,
-        message: `New appointment requested by Patient #${appointment.studentId}`,
-        type: 'appointment',
+        message: "You have a new appointment request",
+        type: "appointment_request",
         relatedId: appointment.id,
+        read: false
       });
-      wsServer.broadcastToUser(appointment.doctorId, 'notification', notification);
 
+      // Broadcast via WS
+      wsServer.broadcastToUser(appointment.doctorId, 'notification', { message: "New appointment request" });
+      
       res.status(201).json(appointment);
     } catch (err) {
       if (err instanceof z.ZodError) {
@@ -275,7 +277,7 @@ export async function registerRoutes(
   app.put(api.appointments.update.path, requireAuth, async (req, res) => {
     try {
       const input = api.appointments.update.input.parse(req.body);
-      const id = parseInt(req.params.id);
+      const id = req.params.id as string;
       
       if (req.session.role !== "doctor") {
          return res.status(401).json({ message: "Only doctors can update appointment status" });
@@ -283,14 +285,16 @@ export async function registerRoutes(
       
       const appointment = await storage.updateAppointment(id, input.status, input.notes);
       
-      // Notify the student
-      const notification = await storage.createNotification({
+      // Notify student
+      await storage.createNotification({
         userId: appointment.studentId,
         message: `Your appointment has been ${input.status}`,
-        type: 'appointment',
+        type: "appointment_update",
         relatedId: appointment.id,
+        read: false
       });
-      wsServer.broadcastToUser(appointment.studentId, 'notification', notification);
+
+      wsServer.broadcastToUser(appointment.studentId, 'notification', { message: `Appointment ${input.status}` });
       
       res.status(200).json(appointment);
     } catch (err) {
@@ -304,7 +308,7 @@ export async function registerRoutes(
   app.put(api.appointments.feedback.path, requireAuth, async (req, res) => {
     try {
       const input = api.appointments.feedback.input.parse(req.body);
-      const id = parseInt(req.params.id);
+      const id = req.params.id as string;
       
       if (req.session.role !== "student") {
          return res.status(401).json({ message: "Only students can leave feedback" });
@@ -321,7 +325,7 @@ export async function registerRoutes(
   });
 
   app.delete(api.appointments.delete.path, requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = req.params.id as string;
     await storage.deleteAppointment(id);
     res.status(204).send();
   });
@@ -339,8 +343,8 @@ export async function registerRoutes(
       }
       
       const inputSchema = api.medicalRecords.create.input.extend({
-        patientId: z.coerce.number(),
-        doctorId: z.coerce.number()
+        patientId: z.string(),
+        doctorId: z.string()
       });
       const input = inputSchema.parse(req.body);
       
@@ -356,7 +360,7 @@ export async function registerRoutes(
 
   // Messages
   app.get(api.messages.list.path, requireAuth, async (req, res) => {
-    const otherUserId = parseInt(req.params.userId);
+    const otherUserId = req.params.userId as string;
     const messages = await storage.getMessages(req.session.userId!, otherUserId);
     res.status(200).json(messages);
   });
@@ -364,8 +368,8 @@ export async function registerRoutes(
   app.post(api.messages.create.path, requireAuth, async (req, res) => {
     try {
       const inputSchema = api.messages.create.input.extend({
-        senderId: z.coerce.number(),
-        receiverId: z.coerce.number()
+        senderId: z.string(),
+        receiverId: z.string()
       });
       const input = inputSchema.parse(req.body);
       
@@ -388,7 +392,7 @@ export async function registerRoutes(
   });
 
   app.put(api.messages.markRead.path, requireAuth, async (req, res) => {
-    const senderId = parseInt(req.params.senderId);
+    const senderId = req.params.senderId as string;
     await storage.markMessagesRead(req.session.userId!, senderId);
     res.status(200).json({ success: true });
   });
@@ -400,7 +404,7 @@ export async function registerRoutes(
   });
 
   app.put(api.notifications.markRead.path, requireAuth, async (req, res) => {
-    const id = parseInt(req.params.id);
+    const id = req.params.id as string;
     await storage.markNotificationRead(id);
     res.status(200).json({ success: true });
   });

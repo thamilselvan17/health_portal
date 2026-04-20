@@ -43,7 +43,7 @@ export function RecordsPage() {
 
     try {
       await createRecord.mutateAsync({
-        patientId: parseInt(selectedPatientId),
+        patientId: selectedPatientId,
         doctorId: user.id,
         diagnosis,
         prescription,

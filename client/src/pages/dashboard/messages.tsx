@@ -17,7 +17,7 @@ import type { Message } from "@shared/schema";
 export function MessagesPage() {
   const { user } = useAuth();
   const { sendMessage } = useWebSocket();
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +33,7 @@ export function MessagesPage() {
   });
 
   const markReadMutation = useMutation({
-    mutationFn: async (senderId: number) => {
+    mutationFn: async (senderId: string) => {
       await apiRequest("PUT", `/api/messages/${senderId}/read`);
     },
     onSuccess: () => {
@@ -84,7 +84,7 @@ export function MessagesPage() {
     setMessageInput("");
   };
 
-  const getContactStatus = (contactId: number) => {
+  const getContactStatus = (contactId: string) => {
     // We could add online presence later. For now, just return a default dot.
     return "bg-emerald-500"; 
   };

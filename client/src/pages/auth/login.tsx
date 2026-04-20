@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("student");
+  const [role, setRole] = useState<"student" | "doctor" | "admin">("student");
   const { login, isLoggingIn } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -52,16 +52,20 @@ export function LoginPage() {
             <Label>I am a...</Label>
             <RadioGroup 
               value={role} 
-              onValueChange={setRole} 
+              onValueChange={(val) => setRole(val as "student" | "doctor" | "admin")} 
               className="flex gap-4"
             >
-              <div className="flex items-center space-x-2 border rounded-xl p-4 w-full cursor-pointer hover:border-primary transition-colors">
+              <div className="flex items-center space-x-2 border rounded-xl p-3 w-full cursor-pointer hover:border-primary transition-colors">
                 <RadioGroupItem value="student" id="r-student" />
-                <Label htmlFor="r-student" className="cursor-pointer flex-1">Student</Label>
+                <Label htmlFor="r-student" className="cursor-pointer flex-1 text-sm">Student</Label>
               </div>
-              <div className="flex items-center space-x-2 border rounded-xl p-4 w-full cursor-pointer hover:border-primary transition-colors">
+              <div className="flex items-center space-x-2 border rounded-xl p-3 w-full cursor-pointer hover:border-primary transition-colors">
                 <RadioGroupItem value="doctor" id="r-doctor" />
-                <Label htmlFor="r-doctor" className="cursor-pointer flex-1">Doctor</Label>
+                <Label htmlFor="r-doctor" className="cursor-pointer flex-1 text-sm">Doctor</Label>
+              </div>
+              <div className="flex items-center space-x-2 border rounded-xl p-3 w-full cursor-pointer hover:border-primary transition-colors">
+                <RadioGroupItem value="admin" id="r-admin" />
+                <Label htmlFor="r-admin" className="cursor-pointer flex-1 text-sm">Admin</Label>
               </div>
             </RadioGroup>
           </div>

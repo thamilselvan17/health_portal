@@ -35,7 +35,7 @@ export function useCreateAppointment() {
 export function useUpdateAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: number } & z.infer<typeof api.appointments.update.input>) => {
+    mutationFn: async ({ id, ...data }: { id: string } & z.infer<typeof api.appointments.update.input>) => {
       const url = buildUrl(api.appointments.update.path, { id });
       const res = await fetch(url, {
         method: api.appointments.update.method,
@@ -55,7 +55,7 @@ export function useUpdateAppointment() {
 export function useDeleteAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       const url = buildUrl(api.appointments.delete.path, { id });
       const res = await fetch(url, {
         method: api.appointments.delete.method,

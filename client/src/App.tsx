@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { WebSocketProvider } from "@/hooks/use-websocket";
+import { ThemeProvider } from "@/components/theme-provider";
 import NotFound from "@/pages/not-found";
 
 import { LandingPage } from "./pages/landing";
@@ -15,6 +16,7 @@ import { RecordsPage } from "./pages/dashboard/records";
 import { PatientsPage } from "./pages/dashboard/patients";
 import { AvailabilityPage } from "./pages/dashboard/availability";
 import { MessagesPage } from "./pages/dashboard/messages";
+import StaffPage from "./pages/dashboard/staff";
 
 function Router() {
   return (
@@ -29,6 +31,7 @@ function Router() {
       <Route path="/dashboard/availability" component={AvailabilityPage} />
       <Route path="/dashboard/records" component={RecordsPage} />
       <Route path="/dashboard/patients" component={PatientsPage} />
+      <Route path="/dashboard/staff" component={StaffPage} />
       <Route path="/dashboard/messages" component={MessagesPage} />
       
       <Route component={NotFound} />
@@ -38,14 +41,16 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <WebSocketProvider>
-          <Toaster />
-          <Router />
-        </WebSocketProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <WebSocketProvider>
+            <Toaster />
+            <Router />
+          </WebSocketProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 

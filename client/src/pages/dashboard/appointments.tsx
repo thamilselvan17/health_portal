@@ -7,6 +7,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useDoctors, usePatients } from "@/hooks/use-users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { StatusBadge } from "@/components/status-badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ export function AppointmentsPage() {
   const [viewDate, setViewDate] = useState<Date>(new Date());
   const [date, setDate] = useState<Date>();
   const [selectedSlot, setSelectedSlot] = useState<string>("");
+  const [reason, setReason] = useState("");
 
   const { data: availableSlots, isLoading: isLoadingSlots } = useQuery({
     queryKey: ["/api/doctors/slots", selectedDoctorId, date],
@@ -66,20 +68,22 @@ export function AppointmentsPage() {
     try {
       await createAppointment.mutateAsync({
         studentId: user.id,
-        doctorId: parseInt(selectedDoctorId),
+        doctorId: selectedDoctorId,
         date: appointmentDate,
+        reason: reason || "General Consultation",
       });
       setIsDialogOpen(false);
       toast({ title: "Success", description: "Appointment requested successfully!" });
       setDate(undefined);
       setSelectedDoctorId("");
       setSelectedSlot("");
+      setReason("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
   };
 
-  const handleStatusUpdate = async (id: number, status: string) => {
+  const handleStatusUpdate = async (id: string, status: "pending" | "approved" | "rejected" | "completed") => {
     try {
       await updateAppointment.mutateAsync({ id, status });
       toast({ title: "Updated", description: `Appointment marked as ${status}` });
@@ -249,6 +253,17 @@ export function AppointmentsPage() {
                       />
                     </PopoverContent>
                   </Popover>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reason">Reason for Visit</Label>
+                  <Input 
+                    id="reason" 
+                    placeholder="Briefly describe your concern"
+                    className="rounded-xl h-12"
+                    value={reason}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setReason(e.target.value)}
+                  />
                 </div>
 
                 {date && selectedDoctorId && (

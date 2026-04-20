@@ -65,7 +65,7 @@ export function AvailabilityPage() {
 
   const updateMutation = useMutation({
     mutationFn: async (newAvailability: any[]) => {
-      const res = await apiRequest("PUT", "/api/doctors/availability", {
+      const res = await apiRequest("PUT", `/api/doctors/${user?.id}/availability`, {
         availability: newAvailability
       });
       return res.json();

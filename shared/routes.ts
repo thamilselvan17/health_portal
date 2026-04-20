@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 // ── Shared response schemas ────────────────────────────
+// We use string IDs for MongoDB compatibility
+
 const userResponseSchema = z.object({
-  id: z.number(),
+  id: z.string(),
   name: z.string(),
   email: z.string(),
   role: z.string(),
@@ -10,9 +12,9 @@ const userResponseSchema = z.object({
 });
 
 const appointmentResponseSchema = z.object({
-  id: z.number(),
-  studentId: z.number(),
-  doctorId: z.number(),
+  id: z.string(),
+  studentId: z.string(),
+  doctorId: z.string(),
   date: z.coerce.date(),
   reason: z.string(),
   status: z.string(),
@@ -22,9 +24,9 @@ const appointmentResponseSchema = z.object({
 });
 
 const medicalRecordResponseSchema = z.object({
-  id: z.number(),
-  patientId: z.number(),
-  doctorId: z.number(),
+  id: z.string(),
+  patientId: z.string(),
+  doctorId: z.string(),
   date: z.coerce.date(),
   diagnosis: z.string(),
   prescription: z.string().nullable(),
@@ -34,6 +36,16 @@ const medicalRecordResponseSchema = z.object({
 export type AuthResponse = z.infer<typeof userResponseSchema>;
 export type AppointmentResponse = z.infer<typeof appointmentResponseSchema>;
 export type MedicalRecordResponse = z.infer<typeof medicalRecordResponseSchema>;
+
+const adminMetricsResponseSchema = z.object({
+  totalStudents: z.number(),
+  totalDoctors: z.number(),
+  totalAppointments: z.number(),
+  totalRecords: z.number(),
+  appointmentsByStatus: z.record(z.string(), z.number()),
+});
+
+export type AdminMetricsResponse = z.infer<typeof adminMetricsResponseSchema>;
 
 // ── Helper ─────────────────────────────────────────────
 export function buildUrl(
@@ -57,7 +69,7 @@ export const api = {
         name: z.string().min(1, "Name is required"),
         email: z.string().email("Invalid email"),
         password: z.string().min(6, "Password must be at least 6 characters"),
-        role: z.enum(["student", "doctor"]),
+        role: z.enum(["student", "doctor", "admin"]),
       }),
       responses: { 201: userResponseSchema },
     },
@@ -67,7 +79,7 @@ export const api = {
       input: z.object({
         email: z.string().email(),
         password: z.string(),
-        role: z.enum(["student", "doctor"]),
+        role: z.enum(["student", "doctor", "admin"]),
       }),
       responses: { 200: userResponseSchema },
     },
@@ -100,6 +112,14 @@ export const api = {
       path: "/api/users/avatar",
       input: z.object({ avatar: z.string() }),
       responses: { 200: userResponseSchema },
+    },
+  },
+
+  admin: {
+    metrics: {
+      method: "GET" as const,
+      path: "/api/admin/metrics",
+      responses: { 200: adminMetricsResponseSchema },
     },
   },
 
@@ -140,8 +160,8 @@ export const api = {
       method: "POST" as const,
       path: "/api/appointments",
       input: z.object({
-        studentId: z.number(),
-        doctorId: z.number(),
+        studentId: z.string(),
+        doctorId: z.string(),
         date: z.coerce.date(),
         reason: z.string().min(1, "Reason is required"),
       }),
@@ -182,8 +202,8 @@ export const api = {
       method: "POST" as const,
       path: "/api/medical-records",
       input: z.object({
-        patientId: z.number(),
-        doctorId: z.number(),
+        patientId: z.string(),
+        doctorId: z.string(),
         diagnosis: z.string().min(1, "Diagnosis is required"),
         prescription: z.string().optional(),
         notes: z.string().optional(),
@@ -202,8 +222,8 @@ export const api = {
       method: "POST" as const,
       path: "/api/messages",
       input: z.object({
-        senderId: z.number(),
-        receiverId: z.number(),
+        senderId: z.string(),
+        receiverId: z.string(),
         content: z.string().min(1),
       }),
       responses: { 201: z.any() },

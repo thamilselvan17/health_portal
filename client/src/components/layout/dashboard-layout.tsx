@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Loader2, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 export function DashboardLayout({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -39,6 +40,7 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
               </h1>
             </div>
             <div className="flex items-center gap-4">
+              <ThemeToggle />
               <Button size="icon" variant="ghost" className="rounded-full relative">
                 <Bell className="w-5 h-5 text-muted-foreground" />
                 <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-destructive border-2 border-white"></span>

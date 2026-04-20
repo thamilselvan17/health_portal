@@ -6,3 +6,5 @@ vite.config.ts.*
 *.tar.gz
 sqlite.db
 .vercel
+.env
+test_*.ts

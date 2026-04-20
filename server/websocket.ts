@@ -4,7 +4,7 @@ import type { Request } from "express";
 import session from "express-session";
 
 interface ExtendedWebSocket extends WebSocket {
-  userId?: number;
+  userId?: string;
   role?: string;
   isAlive: boolean;
 }
@@ -71,7 +71,7 @@ export function setupWebSocket(server: Server, sessionMiddleware: any) {
   });
 
   return {
-    broadcastToUser: (userId: number, event: string, data: any) => {
+    broadcastToUser: (userId: string, event: string, data: any) => {
       wss.clients.forEach((client) => {
         const extClient = client as ExtendedWebSocket;
         if (extClient.readyState === WebSocket.OPEN && extClient.userId === userId) {

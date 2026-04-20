@@ -50,7 +50,14 @@ export function AppSidebar() {
     { title: "Messages", url: "/dashboard/messages", icon: MessageSquare },
   ];
 
-  const items = isStudent ? studentItems : doctorItems;
+  const adminItems = [
+    { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+    { title: "Manage Staff", url: "/dashboard/staff", icon: Users },
+  ];
+
+  let items = studentItems;
+  if (user.role === "doctor") items = doctorItems;
+  if (user.role === "admin") items = adminItems;
 
   const handleLogout = async () => {
     await logout();

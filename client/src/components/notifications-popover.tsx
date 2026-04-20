@@ -23,7 +23,7 @@ export function NotificationsPopover() {
   });
 
   const markReadMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (id: string) => {
       await apiRequest("PUT", `/api/notifications/${id}/read`);
     },
     onSuccess: () => {
