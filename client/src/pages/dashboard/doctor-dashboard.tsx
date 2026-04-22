@@ -1,10 +1,12 @@
 import { useAuth } from "@/hooks/use-auth";
-import { useAppointments } from "@/hooks/use-appointments";
+import { useAppointments, useUpdateAppointment } from "@/hooks/use-appointments";
 import { usePatients } from "@/hooks/use-users";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, FileText, Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, FileText, Bell, CheckCircle2, XCircle } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { motion } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 
 const containerVariants = {
@@ -23,9 +25,20 @@ export function DoctorDashboard() {
   const { user } = useAuth();
   const { data: appointments, isLoading: isLoadingAppts } = useAppointments();
   const { data: patients, isLoading: isLoadingPatients } = usePatients();
+  const updateAppointment = useUpdateAppointment();
+  const { toast } = useToast();
 
   const myAppointments = appointments?.filter(a => a.doctorId === user?.id) || [];
   const pendingRequests = myAppointments.filter(a => a.status === 'pending');
+
+  const handleStatusUpdate = async (id: string, status: "approved" | "rejected") => {
+    try {
+      await updateAppointment.mutateAsync({ id, status });
+      toast({ title: "Updated", description: `Appointment marked as ${status}` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
   const todayAppointments = myAppointments.filter(a => isToday(new Date(a.date)) && a.status === 'approved');
 
   const statusData = [
@@ -85,6 +98,55 @@ export function DoctorDashboard() {
       </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <motion.div variants={itemVariants} className="space-y-4">
+          <h3 className="text-xl font-display font-bold">Pending Approval Requests</h3>
+          <Card className="rounded-2xl border-none shadow-sm overflow-hidden bg-card">
+            <div className="divide-y divide-border">
+              {isLoadingAppts ? (
+                <div className="p-8 text-center text-muted-foreground">Loading...</div>
+              ) : pendingRequests.length > 0 ? (
+                pendingRequests.map((appt) => {
+                  const patient = patients?.find(p => p.id === appt.studentId);
+                  return (
+                    <div key={appt.id} className="p-6 flex items-center justify-between hover:bg-muted/50 transition-colors">
+                      <div>
+                        <h4 className="font-semibold text-lg">{patient?.name || `Patient #${appt.studentId}`}</h4>
+                        <p className="text-sm text-primary">
+                          {format(new Date(appt.date), "MMM do, h:mm a")} - <span className="text-muted-foreground italic">"{appt.reason}"</span>
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          className="h-9 w-9 rounded-full text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 border-emerald-200"
+                          onClick={() => handleStatusUpdate(appt.id, 'approved')}
+                          title="Approve"
+                        >
+                          <CheckCircle2 className="w-5 h-5" />
+                        </Button>
+                        <Button 
+                          size="icon" 
+                          variant="outline" 
+                          className="h-9 w-9 rounded-full text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/20"
+                          onClick={() => handleStatusUpdate(appt.id, 'rejected')}
+                          title="Reject"
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="p-12 text-center text-muted-foreground">
+                  <p>No pending appointment requests.</p>
+                </div>
+              )}
+            </div>
+          </Card>
+        </motion.div>
+
         <motion.div variants={itemVariants} className="space-y-4">
           <h3 className="text-xl font-display font-bold">Today's Appointments</h3>
           <Card className="rounded-2xl border-none shadow-sm overflow-hidden bg-card">
